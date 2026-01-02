@@ -1,4 +1,53 @@
+/* ===============================
+   CARGAR HORARIOS GUARDADOS
+================================ */
+window.onload = function () {
+  const saved = localStorage.getItem("medSchedule");
+  if (!saved) return;
+
+  const data = JSON.parse(saved);
+
+  if (data.loperamida) {
+    loperaTime.value = data.loperamida.time || "";
+    loperaFreq.value = data.loperamida.freq || 8;
+  }
+
+  if (data.hioscina) {
+    hiosTime.value = data.hioscina.time || "";
+    hiosFreq.value = data.hioscina.freq || 8;
+  }
+
+  if (data.metro) {
+    metroTime.value = data.metro.time || "";
+    metroFreq.value = data.metro.freq || 8;
+  }
+};
+
+/* ===============================
+   GUARDAR HORARIOS
+================================ */
+function guardarHorarios() {
+  const data = {
+    loperamida: {
+      time: loperaTime.value,
+      freq: Number(loperaFreq.value),
+    },
+    hioscina: {
+      time: hiosTime.value,
+      freq: Number(hiosFreq.value),
+    },
+    metro: {
+      time: metroTime.value,
+      freq: Number(metroFreq.value),
+    },
+  };
+
+  localStorage.setItem("medSchedule", JSON.stringify(data));
+}
+
 function calcularProximas() {
+  guardarHorarios();
+
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
@@ -8,11 +57,7 @@ function calcularProximas() {
       time: loperaTime.value,
       freq: Number(loperaFreq.value),
     },
-    {
-      name: "Hioscina",
-      time: hiosTime.value,
-      freq: Number(hiosFreq.value),
-    },
+    { name: "Hioscina", time: hiosTime.value, freq: Number(hiosFreq.value) },
     {
       name: "Metronidazol",
       time: metroTime.value,
@@ -31,12 +76,15 @@ function calcularProximas() {
       <tbody>`;
 
   meds.forEach((med) => {
-    // Hora inicial (HOY)
+    if (!med.time || !med.freq) return;
+
     let [h, m] = med.time.split(":").map(Number);
+
+    // Hora inicial (hoy)
     let start = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate(),
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate(),
       h,
       m
     );
@@ -44,9 +92,18 @@ function calcularProximas() {
     // Próxima toma = hora inicial + frecuencia
     let next = new Date(start.getTime() + med.freq * 60 * 60 * 1000);
 
-    // Determinar si es hoy o mañana
-    let dayLabel =
-      next > today && next.getDate() !== today.getDate() ? "Tomorrow" : "Today";
+    // Etiqueta de día
+    let dayLabel;
+    if (next.toDateString() === today.toDateString()) {
+      dayLabel = "Today";
+    } else if (
+      next.toDateString() ===
+      new Date(today.getTime() + 24 * 60 * 60 * 1000).toDateString()
+    ) {
+      dayLabel = "Tomorrow";
+    } else {
+      dayLabel = next.toLocaleDateString();
+    }
 
     let timeStr = next.toLocaleTimeString([], {
       hour: "2-digit",
