@@ -1,122 +1,96 @@
 /* ===============================
-   CARGAR HORARIOS GUARDADOS
+   CALCULAR Y GUARDAR HORARIOS
 ================================ */
-window.onload = function () {
-  const saved = localStorage.getItem("medSchedule");
-  if (!saved) return;
-
-  const data = JSON.parse(saved);
-
-  if (data.loperamida) {
-    loperaTime.value = data.loperamida.time || "";
-    loperaFreq.value = data.loperamida.freq || 8;
-  }
-
-  if (data.hioscina) {
-    hiosTime.value = data.hioscina.time || "";
-    hiosFreq.value = data.hioscina.freq || 8;
-  }
-
-  if (data.metro) {
-    metroTime.value = data.metro.time || "";
-    metroFreq.value = data.metro.freq || 8;
-  }
-};
-
-/* ===============================
-   GUARDAR HORARIOS
-================================ */
-function guardarHorarios() {
-  const data = {
-    loperamida: {
-      time: loperaTime.value,
-      freq: Number(loperaFreq.value),
-    },
-    hioscina: {
-      time: hiosTime.value,
-      freq: Number(hiosFreq.value),
-    },
-    metro: {
-      time: metroTime.value,
-      freq: Number(metroFreq.value),
-    },
-  };
-
-  localStorage.setItem("medSchedule", JSON.stringify(data));
-}
-
 function calcularProximas() {
-  guardarHorarios();
-
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-  let meds = [
+  const medicamentos = [
     {
-      name: "Loperamida",
-      time: loperaTime.value,
-      freq: Number(loperaFreq.value),
+      nombre: "Loperamida",
+      time: "loperaTime",
+      freq: "loperaFreq",
     },
-    { name: "Hioscina", time: hiosTime.value, freq: Number(hiosFreq.value) },
     {
-      name: "Metronidazol",
-      time: metroTime.value,
-      freq: Number(metroFreq.value),
+      nombre: "Hioscina",
+      time: "hiosTime",
+      freq: "hiosFreq",
+    },
+    {
+      nombre: "Metronidazol",
+      time: "metroTime",
+      freq: "metroFreq",
     },
   ];
 
-  let html = `
-    <table class="table table-striped">
-      <thead>
-        <tr>
-          <th>Medicamento</th>
-          <th>Próxima toma</th>
-        </tr>
-      </thead>
-      <tbody>`;
+  let resultadoHTML = "";
+  let dataToSave = [];
 
-  meds.forEach((med) => {
-    if (!med.time || !med.freq) return;
+  medicamentos.forEach((med) => {
+    const horaInicial = document.getElementById(med.time).value;
+    const frecuencia = parseInt(document.getElementById(med.freq).value);
 
-    let [h, m] = med.time.split(":").map(Number);
+    if (!horaInicial || !frecuencia) return;
 
-    // Hora inicial (hoy)
-    let start = new Date(
-      today.getFullYear(),
-      today.getMonth(),
-      today.getDate(),
-      h,
-      m
-    );
+    const [hh, mm] = horaInicial.split(":").map(Number);
+    const ahora = new Date();
 
-    // Próxima toma = hora inicial + frecuencia
-    let next = new Date(start.getTime() + med.freq * 60 * 60 * 1000);
+    let proxima = new Date();
+    proxima.setHours(hh, mm, 0, 0);
+    proxima.setHours(proxima.getHours() + frecuencia);
 
-    // Etiqueta de día
-    let dayLabel;
-    if (next.toDateString() === today.toDateString()) {
-      dayLabel = "Today";
-    } else if (
-      next.toDateString() ===
-      new Date(today.getTime() + 24 * 60 * 60 * 1000).toDateString()
-    ) {
-      dayLabel = "Tomorrow";
-    } else {
-      dayLabel = next.toLocaleDateString();
-    }
+    const esManana = proxima.getDate() !== ahora.getDate();
+    const etiquetaDia = esManana ? "Mañana" : "Hoy";
 
-    let timeStr = next.toLocaleTimeString([], {
+    const horaFormateada = proxima.toLocaleTimeString("es-CO", {
       hour: "2-digit",
       minute: "2-digit",
     });
 
-    html += `
-      <tr>
-        <td>${med.name}</td>
-        <td>${dayLabel} at ${timeStr}</td>
-      </tr>`;
+    resultadoHTML += `
+      <div class="alert alert-info">
+        <strong>${med.nombre}</strong><br>
+        Próxima dosis: <b>${etiquetaDia} a las ${horaFormateada}</b>
+      </div>
+    `;
+
+    dataToSave.push({
+      nombre: med.nombre,
+      horaInicial,
+      frecuencia,
+      proxima: proxima.toISOString(),
+    });
   });
 
-  html += "</tbody></table>";
-  document.getElementById("resultado").innerHTML = html;
+  document.getElementById("resultado").innerHTML = resultadoHTML;
+
+  // 💾 Guardar en localStorage
+  localStorage.setItem("medSchedule", JSON.stringify(dataToSave));
 }
+
+/* ===============================
+   CARGAR DATOS AL INICIAR
+================================ */
+document.addEventListener("DOMContentLoaded", function () {
+  const savedData = localStorage.getItem("medSchedule");
+  if (!savedData) return;
+
+  const medicamentos = JSON.parse(savedData);
+
+  medicamentos.forEach((med) => {
+    if (med.nombre === "Loperamida") {
+      document.getElementById("loperaTime").value = med.horaInicial;
+      document.getElementById("loperaFreq").value = med.frecuencia;
+    }
+
+    if (med.nombre === "Hioscina") {
+      document.getElementById("hiosTime").value = med.horaInicial;
+      document.getElementById("hiosFreq").value = med.frecuencia;
+    }
+
+    if (med.nombre === "Metronidazol") {
+      document.getElementById("metroTime").value = med.horaInicial;
+      document.getElementById("metroFreq").value = med.frecuencia;
+    }
+  });
+
+  // 🔁 Recalcular automáticamente
+  calcularProximas();
+});
